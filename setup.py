@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='dot_tree',
+    name='python-dot-tree',
     version='1.0.2',
     author='nebko16',
     author_email='nebko16@gmail.com',
