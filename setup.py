@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='python-dot-tree',
-    version='1.0.2',
+    version='1.0.3',
     author='nebko16',
     author_email='nebko16@gmail.com',
     description='Asset manager for python that leverages dot notation for simplified usage',

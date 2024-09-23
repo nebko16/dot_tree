@@ -2,6 +2,10 @@
 
 ### A.Sugary.Python.Asset.Handler.py.load()
 
+```python
+pip install python-dot-tree
+```
+
 <hr>
 
 DotTree simplifies the handling of assets on disk within Python projects that have a lot of assets, by handling the OS related nuances of paths, while allowing for direct case-insensitive dot-notation syntax in Python to represent your paths and filepaths.  It includes features for caching and precaching, as well as some convenience functions.  Also includes a bundled appdata manager that greatly simplifies loading and saving to data from the user-specific appdata location, completely in an operating system agnostic manner. 
