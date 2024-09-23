@@ -1,0 +1,3 @@
+appdirs
+pygame-ce
+setuptools
