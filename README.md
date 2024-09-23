@@ -251,28 +251,28 @@ The one downside to this is python naming limitations.  Luckily they've been acc
    ```python
    # filename in OS: assets/sprites/1.png
    
-   # solution:add underscore before the filename:
+   # solution: add underscore before the filename in python:
    assets.sprites._1.png
    ```
 2. names of files or directories containing spaces.  python doesn't allow spaces in object names, so spaces get replaced with underscores for referencing.  internally, `DotTree` still references the full actual OS path, but for referencing it via dot notation, just replace the space with underscores
    ```python
    # filename in OS: assets/sprites/first boss.jpg
    
-   # solution: replace spaces with underscores
+   # solution: replace spaces with underscores in python
    assets.sprites.first_boss.jpg
    ```
 3. periods and hyphens in filenames or directory names will not work, as periods are a part of python syntax, and hyphens aren't allowed in python class names.  the resolution is to replace both with underscores
    ```python
    # filename in OS: assets/sprites/brill.innkeeper-1.gif
    
-   # solution: replace hyphens and periods with underscores
+   # solution: replace hyphens and periods with underscores in python
    assets.sprites.brill_innkeeper_1.gif
    ```
 4. special characters that the operating system might allow, but python class names don't, like parenthesis and braces and other non-alphanumeric characters.  the solution is to just remove them.  don't forget though; spaces, hyphens, and periods need to be changed to underscores, but all others need to just be removed
    ```python
    # filename in OS: assets/sprites/tree [brown] (1).tif
    
-   # solution: replace spaces with underscores and remove brackets and parenthesis
+   # solution: replace spaces with underscores and remove brackets and parenthesis in python
    assets.sprites.tree_brown_1.tif
    ```
 
