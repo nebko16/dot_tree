@@ -57,7 +57,7 @@ print(assets.config.settings.conf.load())
 
 That's it.  Also notice how our reference to the file in the actual code resembles what the actual path is in reality?
 
-This module is basically syntactical sugar for accessing files on disk, without added complexity or fluff.  There are a few minor limitations however, related to python naming rules, and you can read about those [here](#limitations). 
+This module is basically syntactical sugar for accessing files on disk, without added complexity or fluff.  There are a few minor limitations however, related to python naming rules, and you can read about those [here](#limitations-of-dottree). 
 
 I made this for myself while I was working on a PyGame project, but decided to pull the PyGame stuff out and put that in a separate class extension, so I can put the base class out there for anyone that wants to tinker with it.
 
