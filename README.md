@@ -11,7 +11,6 @@ DotTree simplifies the handling of assets on disk within Python projects that ha
 ### Features
 
 - uses dot-notation, so your code resembles the actual paths
-- [printing or converting to string outputs the full OS path](#string-representation)
 - handles underlying paths for your OS, making your code operating system agnostic
 - due to the dot notation and python object reference copies, you can [save any branch/node into its own variable](#shortcuts) to use as a shortcut
 - has built-in functions to help with development: [.tree()](#tree), [.ls()](#ls), [.size()](#size)
