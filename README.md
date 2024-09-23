@@ -331,3 +331,20 @@ appdata = AppData('MyAppName', 'UserOfYourApp')
 
 The PyGame specific extension of this class adds a screenshot directory within app data, and the path to it can be retrieved using the screenshots_path instance variable, so you can use that as the location to write screenshots within your game with no work required, as the underlying appdirs module handles the logistics.
 
+The app data directories are most often these locations:
+
+- **macOS**:
+  - `~/Library/Application Support/<app_name>`
+
+- **Linux/Unix**:
+  - `~/.local/share/<app_name>`
+
+- **Windows XP**:
+  - `C:\Documents and Settings\<windows_username>\Application Data\<app_name>`
+
+- **Windows 7+**:
+  - `C:\Users\<windows_username>\AppData\Local\<app_author>\<app_name>`
+
+<hr>
+
+There's a lot of info about the app data stuff in the [docstring](https://github.com/nebko16/dot_tree/blob/5d7b8a7515069e799e3d4eaa577672ffe3804042/src/dot_tree/classes/assets.py#L586), so you can go get all the details there, or you can also check out the [module that this is a wrapper for](https://pypi.org/project/appdirs/). 
