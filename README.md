@@ -168,7 +168,7 @@ assets.size()  # directory
 
 <hr>
 
-#### Shortcuts
+### Shortcuts
 
 Due to `Dot.T using nested objects, and due to how python copies objects by reference if you don't explicitly do a copy, you can make shortcut variables for any node in the tree to reference to shorten code.
 
@@ -225,7 +225,7 @@ print(type(dungeon_themes[0]))
 
 Regarding PyGame specifically, fonts automatically load into PyGame Font objects, images load as PyGame surface objects, and sounds and music get loaded as PyGame mixer objects.  Use the base class if you need to load those types as simply binary.
 
-# Preloading
+## Preloading
 
 When you know you're about to access specific files, specifically a specific branch, if your assets are organized in such a way, you can use `.preload()` on a directory node to recursively preload/precache all assets from that node and lower.  
 
