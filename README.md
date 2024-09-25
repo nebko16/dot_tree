@@ -174,7 +174,7 @@ assets.size()  # directory
 
 ### Shortcuts
 
-Due to `Dot.T using nested objects, and due to how python copies objects by reference if you don't explicitly do a copy, you can make shortcut variables for any node in the tree to reference to shorten code.
+Due to `Dot.Tree` using nested objects, and due to how python copies objects by reference if you don't explicitly do a copy, you can make shortcut variables for any node in the tree to reference to shorten code.
 
 ```python
 assets = GameDotTree("/app/assets")
