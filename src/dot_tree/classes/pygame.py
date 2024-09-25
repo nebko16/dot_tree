@@ -39,11 +39,10 @@ class GameDotTreeBranch(DotTreeBranch):
              alpha: bool = True,
              scaled_width: int = None,
              scaled_height: int = None,
-             scale_percent: float = None):
+             scale_percent: float = None,
+             volume: float = 0.5,
+             font_size: int = 24):
         """
-        this has to be called after pygame is initialized, and after the display
-        mode has been set, otherwise it will error
-
         the behavior of this override method is different from the base class
 
         when called on a file node, this version loads the asset or retrieves
@@ -57,18 +56,21 @@ class GameDotTreeBranch(DotTreeBranch):
         this is useful when loading sprite group assets or parallax backgrounds, etc
         """
         if self.is_file:
-            return self._load(alpha, scaled_width, scaled_height, scale_percent)
+            return self._load(alpha, scaled_width, scaled_height, scale_percent, volume, font_size)
         else:
             files = []
             for file in self.files.values():
-                files.append(file.load(alpha, scaled_width, scaled_height, scale_percent))
+                files.append(file.load(alpha, scaled_width, scaled_height, scale_percent, volume, font_size))
             return files
 
     def _load(self,
               alpha: bool = True,
               scaled_width: int = None,
               scaled_height: int = None,
-              scale_percent: float = None):
+              scale_percent: float = None,
+              volume: float = 0.5,
+              font_size: int = 24):
+
         if self._cached_asset is None:
             ext = os.path.splitext(self.path)[1].lower()
             file_type = GameDotTree.file_extensions.get(ext)
@@ -109,10 +111,11 @@ class GameDotTreeBranch(DotTreeBranch):
             elif file_type == 'sound' or mime_type and mime_type.startswith('audio'):
                 _pygame_mixer_init()
                 self._cached_asset = pygame.mixer.Sound(self.path)
+                self._cached_asset.set_volume(volume)
 
             elif file_type == 'font' or mime_type and mime_type.startswith('font'):
                 _pygame_font_init()
-                self._cached_asset = pygame.font.Font(self.path, 24)
+                self._cached_asset = pygame.font.Font(self.path, font_size)
 
             elif file_type in DotTree.text_extensions or mime_type and mime_type.startswith('text'):
                 with open(self.path, 'r') as f:
@@ -187,36 +190,30 @@ class GameDotTree(DotTree):
         super().__init__(*args, **kwargs)
         self._cached_asset: any = None
 
-    def load(self, alpha=True):
-        if self._cached_asset is None:
-            ext = os.path.splitext(self.path)[1].lower()
-            file_type = self.file_extensions.get(ext)
-            mime_type, _ = mimetypes.guess_type(self.path)
+    def load(self,
+             alpha: bool = True,
+             scaled_width: int = None,
+             scaled_height: int = None,
+             scale_percent: float = None,
+             volume: float = 0.5,
+             font_size: int = 24):
+        """
+        the behavior of this override method is different from the base class
 
-            if file_type == 'image' or mime_type and mime_type.startswith('image'):
-                _pygame_display_init()
-                self._cached_asset = pygame.image.load(self.path)
-                if alpha:
-                    self._cached_asset.convert_alpha()
-                else:
-                    self._cached_asset.convert()
+        when called on a file node, this version loads the asset or retrieves
+        it from cache if already cached, then returns it, like the base class
 
-            elif file_type == 'sound' or mime_type and mime_type.startswith('audio'):
-                _pygame_mixer_init()
-                self._cached_asset = pygame.mixer.Sound(self.path)
+        but if you call this on a directory node, it does the same thing, but for
+        all files in the directory, and returns a python list of the loaded assets
 
-            elif file_type == 'font' or mime_type and mime_type.startswith('font'):
-                _pygame_font_init()
-                self._cached_asset = pygame.font.Font(self.path, 24)
+        this only loads the assets in the immediate directory, and is not recursive
 
-            elif file_type in DotTree.text_extensions or mime_type and mime_type.startswith('text'):
-                with open(self.path, 'r') as f:
-                    self._cached_asset = f.read()
-            else:
-                with open(self.path, 'rb') as f:
-                    self._cached_asset = f.read()
-
-        return self._cached_asset
+        this is useful when loading sprite group assets or parallax backgrounds, etc
+        """
+        files = []
+        for file in self.files.values():
+            files.append(file.load(alpha, scaled_width, scaled_height, scale_percent, volume, font_size))
+        return files
 
     def build_tree(self, path):
         ignore_pattern = re.compile('|'.join(self.ignored_files))

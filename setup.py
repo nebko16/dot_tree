@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='python-dot-tree',
-    version='1.0.3',
+    version='1.0.4',
     author='nebko16',
     author_email='nebko16@gmail.com',
     description='Asset manager for python that leverages dot notation for simplified usage',
@@ -11,7 +11,8 @@ setup(
     packages=find_packages(where='src'),
     install_requires=[
         'setuptools',
-        'pygame-ce'
+        'pygame-ce',
+        'appdirs'
     ],
     package_dir={'': 'src'},
     include_package_data=True,
