@@ -11,7 +11,8 @@ setup(
     packages=find_packages(where='src'),
     install_requires=[
         'setuptools',
-        'pygame-ce'
+        'pygame-ce',
+        'appdirs'
     ],
     package_dir={'': 'src'},
     include_package_data=True,
