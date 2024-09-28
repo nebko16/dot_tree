@@ -138,8 +138,14 @@ class DotTreeBranch(os.PathLike):
                 self.children[py_name] = subdir
                 subdir.build_tree(child_path)
             else:
-                base_name = py_name.split('.')[0].strip().lower()
-                extension = py_name.split('.')[1].strip().lower()
+                if '.' in py_name:
+                    base_name = py_name.split('.')[0].strip().lower()
+                else:
+                    base_name = py_name.strip().lower()
+                if '.' in py_name:
+                    extension = py_name.split('.')[1].strip().lower()
+                else:
+                    extension = None
                 file = DotTreeBranch(base_name,
                                      node,
                                      child_path,
@@ -397,13 +403,16 @@ class DotTree:
                 base_name = py_name.split('.')[0].strip().lower()
                 if base_name[0:1].isnumeric():
                     base_name = f"_{base_name}"
-                extension = py_name.split('.')[1].strip().lower()
+                if '.' in py_name:
+                    extension = py_name.split('.')[1].strip().lower()
+                else:
+                    extension = None
                 file = DotTreeBranch(base_name,
-                                 node,
-                                 child_path,
-                                 parent=self,
-                                 extension=extension,
-                                 is_file=True)
+                                     node,
+                                     child_path,
+                                     parent=self,
+                                     extension=extension,
+                                     is_file=True)
                 self.files_base_name[base_name] = file
                 self.files[py_name] = file
 
