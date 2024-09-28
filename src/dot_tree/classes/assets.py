@@ -149,12 +149,12 @@ class DotTreeBranch(os.PathLike):
                 self.files_base_name[base_name] = file
                 self.files[py_name] = file
 
-    def load(self, mode='auto'):
+    def load(self, mode='auto', decode: str = None):
         if not self.is_file:
             raise AttributeError("\n\n  load() is for file nodes.\n\n  "
                                  f"This node is a directory: {self.path}\n\n")
         if self._cached_asset is None:
-            ext = os.path.splitext(self.path)[1].lower()
+            ext = os.path.splitext(self.path)[1].lower().replace('.', '')
             if ext.lower() in DotTree.text_extensions or mode == 'r':
                 try:
                     with open(self.path, 'r') as f:
@@ -165,7 +165,8 @@ class DotTreeBranch(os.PathLike):
             else:
                 with open(self.path, 'rb') as f:
                     self._cached_asset = f.read()
-
+        if decode:
+            self._cached_asset = self._cached_asset.decode(decode)
         return self._cached_asset
 
     def unload(self):
@@ -351,16 +352,21 @@ class DotTree:
         name = raw_name.strip().lower()
         if name in self.children:
             return self.children[name]
-        raise AttributeError(f"Attribute {raw_name} not found.")
+        if name in self.files:
+            return self.files[name]
+        if name in self.files_base_name:
+            return self.files_base_name[name]
+        raise AttributeError(f"file or folder `{raw_name}` not found")
 
     def __getitem__(self, raw_key):
         key = raw_key.strip().lower()
         if key in self.children:
             return self.children[key]
-        elif key in self.files:
+        if key in self.files:
             return self.files[key]
-        else:
-            raise KeyError(f"'{raw_key}' not found in DotTree")
+        if key in self.files_base_name:
+            return self.files_base_name[key]
+        raise KeyError(f"file or folder `{raw_key}` not found")
 
     def get(self, key, default=None):
         if key in self.children:
