@@ -4,29 +4,30 @@ import pygame
 import mimetypes
 from dot_tree.classes.assets import DotTree, DotTreeBranch, AppData, logger
 
+screen: pygame.Surface = None
 
 
 def _pygame_init():
     if not pygame.get_init():
-        pygame.init()
+        raise Exception("Pygame must be initialized before using this method")
 
 
 def _pygame_display_init():
     _pygame_init()
     if not pygame.display.get_init():
-        pygame.display.set_mode((800, 600))
+        raise Exception("Pygame display must be initialized before using this method")
 
 
 def _pygame_mixer_init():
     _pygame_init()
     if not pygame.mixer.get_init():
-        pygame.mixer.init()
+        raise Exception("Pygame mixer must be initialized before using this method")
 
 
 def _pygame_font_init():
     _pygame_init()
     if not pygame.font.get_init():
-        pygame.font.init()
+        raise Exception("Pygame font must be initialized before using this method")
 
 
 class GameDotTreeBranch(DotTreeBranch):
@@ -41,7 +42,8 @@ class GameDotTreeBranch(DotTreeBranch):
              scaled_height: int = None,
              scale_percent: float = None,
              volume: float = 0.5,
-             font_size: int = 24):
+             font_size: int = 24,
+             mode: str = 'auto'):
         """
         the behavior of this override method is different from the base class
 
@@ -56,11 +58,23 @@ class GameDotTreeBranch(DotTreeBranch):
         this is useful when loading sprite group assets or parallax backgrounds, etc
         """
         if self.is_file:
-            return self._load(alpha, scaled_width, scaled_height, scale_percent, volume, font_size)
+            return self._load(alpha,
+                              scaled_width,
+                              scaled_height,
+                              scale_percent,
+                              volume,
+                              font_size,
+                              mode=mode)
         else:
             files = []
             for file in self.files.values():
-                files.append(file.load(alpha, scaled_width, scaled_height, scale_percent, volume, font_size))
+                files.append(file.load(alpha,
+                                       scaled_width,
+                                       scaled_height,
+                                       scale_percent,
+                                       volume,
+                                       font_size,
+                                       mode=mode))
             return files
 
     def _load(self,
@@ -69,14 +83,19 @@ class GameDotTreeBranch(DotTreeBranch):
               scaled_height: int = None,
               scale_percent: float = None,
               volume: float = 0.5,
-              font_size: int = 24):
+              font_size: int = 24,
+              mode: str = 'auto'):
 
         if self._cached_asset is None:
             ext = os.path.splitext(self.path)[1].lower()
             file_type = GameDotTree.file_extensions.get(ext)
             mime_type, _ = mimetypes.guess_type(self.path)
 
-            if file_type == 'image' or mime_type and mime_type.startswith('image'):
+            if mode != 'auto':
+                with open(self.path, mode) as f:
+                    self._cached_asset = f.read()
+
+            elif file_type == 'image' or mime_type and mime_type.startswith('image'):
                 _pygame_display_init()
                 self._cached_asset = pygame.image.load(self.path)
                 if alpha:
@@ -133,19 +152,29 @@ class GameDotTreeBranch(DotTreeBranch):
                 continue
             child_path = os.path.join(path, node)
             py_name = GameDotTree.normalize_name(node)
+            child_dot_path = f"{self.dot_path}.{py_name}"
 
             if os.path.isdir(child_path):
-                subdir = GameDotTreeBranch(py_name.lower(), node, child_path, parent=self)
+                subdir = GameDotTreeBranch(py_name.lower(),
+                                           node,
+                                           child_path,
+                                           child_dot_path,
+                                           parent=self)
                 self.children[py_name.lower()] = subdir
                 subdir.build_tree(child_path)
             else:
-                base_name = py_name.split('.')[0]
+                if '.' in py_name:
+                    base_name = py_name.split('.')[0]
+                    extension = py_name.split('.')[1]
+                else:
+                    base_name = py_name
+                    extension = None
                 if base_name[0:1].isnumeric():
                     base_name = f"_{base_name}"
-                extension = py_name.split('.')[1]
                 file = GameDotTreeBranch(base_name.lower(),
                                          node,
                                          child_path,
+                                         child_dot_path,
                                          parent=self,
                                          extension=extension,
                                          is_file=True)
@@ -189,6 +218,7 @@ class GameDotTree(DotTree):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._cached_asset: any = None
+        self.dot_path = '<GameDotTree>'
 
     def load(self,
              alpha: bool = True,
@@ -196,7 +226,8 @@ class GameDotTree(DotTree):
              scaled_height: int = None,
              scale_percent: float = None,
              volume: float = 0.5,
-             font_size: int = 24):
+             font_size: int = 24,
+             mode: str = 'auto'):
         """
         the behavior of this override method is different from the base class
 
@@ -212,7 +243,7 @@ class GameDotTree(DotTree):
         """
         files = []
         for file in self.files.values():
-            files.append(file.load(alpha, scaled_width, scaled_height, scale_percent, volume, font_size))
+            files.append(file.load(alpha, scaled_width, scaled_height, scale_percent, volume, font_size, mode=mode))
         return files
 
     def build_tree(self, path):
@@ -221,6 +252,7 @@ class GameDotTree(DotTree):
             if ignore_pattern.search(node):
                 continue
             child_path = os.path.join(path, node)
+            child_dot_path = f"{self.dot_path}.{self.normalize_name(node)}"
 
             py_name = self.normalize_name(node)
             if py_name != node:
@@ -230,17 +262,23 @@ class GameDotTree(DotTree):
                 subdir = GameDotTreeBranch(py_name,
                                            node,
                                            child_path,
+                                           child_dot_path,
                                            parent=self)
                 self.children[py_name] = subdir
                 subdir.build_tree(child_path)
             else:
-                base_name = py_name.split('.')[0].strip().lower()
+                if '.' in py_name:
+                    base_name = py_name.split('.')[0].strip().lower()
+                    extension = py_name.split('.')[1].strip().lower()
+                else:
+                    base_name = py_name.strip().lower()
+                    extension = None
                 if base_name[0:1].isnumeric():
                     base_name = f"_{base_name}"
-                extension = py_name.split('.')[1].strip().lower()
                 file = GameDotTreeBranch(base_name,
                                          node,
                                          child_path,
+                                         child_dot_path,
                                          parent=self,
                                          extension=extension,
                                          is_file=True)

@@ -1,13 +1,23 @@
 import os
 import re
+import sys
 import json
 import appdirs
 import logging
 import keyword
+import traceback
 import unicodedata
-
-
 logger = logging.getLogger(__name__)
+
+
+def custom_excepthook(exc_type, exc_value, exc_traceback):
+    if issubclass(exc_type, FileNotFoundError):
+        traceback.print_tb(exc_traceback)
+        print(f"\n\n\n\n  {exc_type.__name__}: {exc_value}\n")
+    else:
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+sys.excepthook = custom_excepthook
+
 
 
 
@@ -17,6 +27,7 @@ class DotTreeBranch(os.PathLike):
                  py_name,
                  os_name,
                  path,
+                 dot_path,
                  parent,
                  is_file=False,
                  extension=None):
@@ -24,6 +35,7 @@ class DotTreeBranch(os.PathLike):
         self.py_name = py_name
         self.os_name = os_name
         self.path = path
+        self.dot_path = dot_path
         self.children = {}
         self.files_base_name = {}
         self.files = {}
@@ -45,24 +57,18 @@ class DotTreeBranch(os.PathLike):
         return open(self.__fspath__(), mode, buffering, encoding, errors, newline)
 
     def get_size(self, units='auto', return_only_value=False, child=False, to_stdout=True):
-
         if not units:
             raise Exception("\n\n\n    Units must be: auto, B, KB, MB, GB, or TB.\n")
-
         size: float = 0
-
         if self.is_file:
             size = os.path.getsize(self.path)
         else:
             for file in self.files.values():
                 size += file.get_size(child=True)
-
             for subdir in self.children.values():
                 size += subdir.get_size(child=True)
-
         if child:
             return size
-
         the_size = DotTree.filesizes(size, units, return_only_value)
         if to_stdout:
             print(the_size)
@@ -88,27 +94,22 @@ class DotTreeBranch(os.PathLike):
         if not self.is_file and name in self.files_base_name:
             return self.files_base_name.get(name)
 
-        base_path = os.path.dirname(self.path)
-        base_filename = self.os_name
-        if '.' in base_filename:
-            base_filename = self.os_name.split('.')[0]
-        filepath = os.path.join(base_path, base_filename)
-        needle = f"{filepath}.{raw_name}"
-        error_msg = f"\n\nFile `{needle}` not found.\n\nFiles in this directory:\n"
-
-        if self.parent.files:
-            for sibling in self.parent.files.values():
-                error_msg += f"  {sibling.os_name}\n"
-
-        raise AttributeError(f"{error_msg}\n\n")
+        joined = f"File or folder not found:\n\n  {self.dot_path}.{raw_name}\n"
+        joined += f"{' ' * (len(self.dot_path))}   {'^' * len(raw_name)}\n"
+        joined += f"  Files in {self.path}:\n\n"
+        files = [f for f in os.listdir(self.path)]
+        lpad = len(max(files, key=len))
+        for file in files:
+            norm_name = DotTree.normalize_name(file).lower()
+            joined += f"  .{os.path.sep}{file.ljust(lpad, ' ')}  {self.dot_path}.{norm_name}\n"
+        raise FileNotFoundError(f"[Errno 2] {joined}")
 
     def __getitem__(self, key):
         if key in self.children:
             return self.children[key]
         elif key in self.files:
             return self.files[key]
-        else:
-            raise KeyError(f"'{key}' not found in this DotTreeBranch")
+        self.__getattr__(key)
 
     def get(self, key, default=None):
         if key in self.children:
@@ -133,8 +134,13 @@ class DotTreeBranch(os.PathLike):
             child_path = os.path.join(path, node)
             py_name = DotTree.normalize_name(node)
             py_name = py_name.lower()
+            child_dot_path = f"{self.dot_path}.{py_name}"
             if os.path.isdir(child_path):
-                subdir = DotTreeBranch(py_name, node, child_path, parent=self)
+                subdir = DotTreeBranch(py_name,
+                                       node,
+                                       child_path,
+                                       child_dot_path,
+                                       parent=self)
                 self.children[py_name] = subdir
                 subdir.build_tree(child_path)
             else:
@@ -146,9 +152,11 @@ class DotTreeBranch(os.PathLike):
                     extension = py_name.split('.')[1].strip().lower()
                 else:
                     extension = None
+
                 file = DotTreeBranch(base_name,
                                      node,
                                      child_path,
+                                     child_dot_path,
                                      parent=self,
                                      extension=extension,
                                      is_file=True)
@@ -157,8 +165,10 @@ class DotTreeBranch(os.PathLike):
 
     def load(self, mode='auto', decode: str = None):
         if not self.is_file:
-            raise AttributeError("\n\n  load() is for file nodes.\n\n  "
-                                 f"This node is a directory: {self.path}\n\n")
+            files = []
+            for file in self.files.values():
+                files.append(file.load())
+            return files
         if self._cached_asset is None:
             ext = os.path.splitext(self.path)[1].lower().replace('.', '')
             if ext.lower() in DotTree.text_extensions or mode == 'r':
@@ -184,13 +194,13 @@ class DotTreeBranch(os.PathLike):
         for child in self.children.values():
             child.unload()
 
-    def show_tree(self, node=None):
+    def show_tree(self, node=None, to_stdout=True):
         if not node:
             node = self
         if self.is_file:
-            logger.warning(f"\n\n  tree() is for directory nodes.\n\n  This node is a file: {self.os_name}\n\n")
+            logger.warning(f"\n\n  show_tree() is for directory nodes.\n\n  This node is a file: {self.os_name}\n\n")
             return ''
-        return self.parent.show_tree(node=node)
+        return self.parent.show_tree(node=node, to_stdout=to_stdout)
     tree = show_tree
 
     def list(self):
@@ -343,6 +353,7 @@ class DotTree:
         if not os.path.isdir(assets_path):
             raise FileNotFoundError(f"{assets_path} is not a directory.")
         self.path = assets_path
+        self.dot_path = '<DotTree>'
         self.os_name = os.path.basename(os.path.dirname(assets_path))
         self.children = {}
         self.is_file = False
@@ -362,7 +373,15 @@ class DotTree:
             return self.files[name]
         if name in self.files_base_name:
             return self.files_base_name[name]
-        raise AttributeError(f"file or folder `{raw_name}` not found")
+        joined = f"File or folder not found:\n\n  {self.dot_path}.{raw_name}\n"
+        joined += f"{' ' * (len(self.dot_path))}   {'^' * len(raw_name)}\n"
+        joined += f"  Files in {self.path}:\n\n"
+        files = [f for f in os.listdir(self.path)]
+        lpad = len(max(files, key=len))
+        for file in files:
+            norm_name = DotTree.normalize_name(file).lower()
+            joined += f"  .{os.path.sep}{file.ljust(lpad, ' ')}  {self.dot_path}.{norm_name}\n"
+        raise FileNotFoundError(f"[Errno 2] {joined}")
 
     def __getitem__(self, raw_key):
         key = raw_key.strip().lower()
@@ -372,7 +391,7 @@ class DotTree:
             return self.files[key]
         if key in self.files_base_name:
             return self.files_base_name[key]
-        raise KeyError(f"file or folder `{raw_key}` not found")
+        self.__getattr__(raw_key)
 
     def get(self, key, default=None):
         if key in self.children:
@@ -387,6 +406,7 @@ class DotTree:
             if ignore_pattern.search(node):
                 continue
             child_path = os.path.join(path, node)
+            child_dot_path = f"{self.dot_path}.{self.normalize_name(node)}"
 
             py_name = self.normalize_name(node)
             if py_name != node:
@@ -394,9 +414,10 @@ class DotTree:
             py_name = py_name.lower()
             if os.path.isdir(child_path):
                 subdir = DotTreeBranch(py_name,
-                                   node,
-                                   child_path,
-                                   parent=self)
+                                       node,
+                                       child_path,
+                                       child_dot_path,
+                                       parent=self)
                 self.children[py_name] = subdir
                 subdir.build_tree(child_path)
             else:
@@ -410,6 +431,7 @@ class DotTree:
                 file = DotTreeBranch(base_name,
                                      node,
                                      child_path,
+                                     child_dot_path,
                                      parent=self,
                                      extension=extension,
                                      is_file=True)
@@ -456,7 +478,7 @@ class DotTree:
                 file_sizes[child.extension] += child.get_size(units='B', return_only_value=True, to_stdout=False)
 
             if files:
-                keys = list(files.keys())
+                keys = [key for key in list(files.keys()) if key]
                 keys.sort()
                 for key in keys:
                     ext = key
