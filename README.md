@@ -1,6 +1,6 @@
 # DotTree
 
-### A.Sugary.Python.Asset.Handler.py.load()
+### Syntactically Sugary Python Asset Handler
 
 ```python
 pip install python-dot-tree
@@ -8,23 +8,41 @@ pip install python-dot-tree
 
 <hr>
 
-DotTree simplifies the handling of assets on disk within Python projects that have a lot of assets, by handling the OS related nuances of paths, while allowing for direct case-insensitive dot-notation syntax in Python to represent your paths and filepaths.  It includes features for caching and precaching, as well as some convenience functions.  Also includes a bundled appdata manager that greatly simplifies loading and saving to data from the user-specific appdata location, completely in an operating system agnostic manner. 
+`Dot.Tree` does two things.
+
+- Simplifies and shortens syntax for handling files
+- Makes code visibly and logically match your file structure
+  - Given this OS path: `assets/config/app.conf` 
+  - This standard python OS-agnostic syntax: 
+    ```python
+    assets_path = os.path.absdir(os.path.dirname(__file__))
+    path = os.path.join(assets_path, 'config', 'app.conf')
+    with open(path, "r") as fh:
+        contents = fh.load()
+    ```
+  - The `Dot.Tree` syntax would be: 
+    ```python
+    assets = DotTree('assets')
+    contents = assets.config.app.conf.load()
+    ```
+
+Interfacing with files isn't exactly hard in Python, but doing it to where it's OS-agnostic can make the code a bit tedious.  `Dot.Tree` heavily simplifies a lot of that by handling it for you.  The `Dot.Tree` syntax is simply dot-notation in Python, matching the actual layout on the file system.  The dot-notation is facilitated by nested objects, which naturally allows for saving a node/branch into a separate variable to use as a shortcut to potentially massively shorten the amount of code.
 
 <hr>
 
 ### Features
 
-- uses dot-notation, so your code resembles the actual paths
-- handles underlying paths for your OS, making your code operating system agnostic
-- due to the dot notation and python object reference copies, you can [save any branch/node into its own variable](#shortcuts) to use as a shortcut
-- has built-in functions to help with development: [.tree()](#tree), [.ls()](#ls), [.size()](#size)
-- automatically caches, so reloading the same file later pulls from memory
-- preload any part of the tree with [.preload()](#preloading) to avoid performance stutters and lag when lazy-loading assets
+- Uses dot-notation, so your code resembles the actual paths in the OS
+- Handles underlying paths for your OS, making your code operating system agnostic
+- Due to the dot-notation and python object reference copies, you can [save any branch/node into its own variable](#shortcuts) to use as a shortcut
+- Has built-in functions to help with development: [.tree()](#tree), [.ls()](#ls), [.size()](#size)
+- Automatically caches, so reloading the same file later pulls from memory
+- Preload any part of the tree with [.preload()](#preloading) to avoid performance stutters and lag when lazy-loading assets
 - [print your dot notation path representation](#string-representation) and the output will be the actual full OS path
-- the dot notation path is a path-like derivative, so you can [directly use it to access files](#use-as-literal-path) in other modules
-- unload a single asset or branch using `.unload()` when memory is priority over caching
-- the dot notation representation is not case-sensitive, so this simplifies typing a path regardless of the mixed case in your paths
-- includes an [appdata interfacing class](#app-data-management) that greatly simplifies saving data to appdata, regardless of the underlying OS
+- The dot-notation path is a path-like derivative, so you can [directly use it to access files](#use-as-literal-path) in other modules
+- Unload a single asset or branch using `.unload()` when memory is priority over caching
+- The dot notation representation is not case-sensitive, so this simplifies typing a path regardless of the mixed case in your paths
+- Includes an [appdata interfacing class](#app-data-management) that greatly simplifies saving data to appdata, regardless of the underlying OS
 
 <hr>
 
@@ -106,7 +124,7 @@ With `DotTree` you can call .tree() on any directory node to get a tree output t
 
 <hr>
 
-### Tree
+### tree()
 
 ```python
 assets = DotTree("/app/assets")
@@ -148,7 +166,7 @@ with open(assets.about.txt, 'r') as fh:
 
 <hr>
 
-### ls
+### ls()
 
 You can run .ls() to get a list of files and directories.  Directories will have a trailing slash.  This returns a python list.
 ```python
@@ -158,7 +176,7 @@ print(assets.sprites.ls())
 
 <hr>
 
-### size
+### size()
 
 You can get the size of a single file or directory (cumulative if it's a directory), by calling .size() on it.
 ```python
@@ -169,6 +187,85 @@ assets.main_logo.jpg.size()  # file
 assets.size()  # directory
 # output: 34.11 MB
 ```
+
+<hr>
+
+### touch()
+
+Named after the bash command, this method can be run from directory nodes to create an empty file within it.  
+
+Returns a shortcut to the new node if you want to optionally use it.
+
+```python
+assets = DotTree("/app/assets")
+
+conf = assets.images.touch('images.conf')
+print(conf)
+# output: /app/assets/images/images.conf
+```
+
+You can also [optionally] create the file AND directly interface with it in a single step.
+```python
+with open(assets.images.touch('images.conf'), 'w') as fh:
+    fh.write('hello world')
+```
+
+<hr>
+
+### mkdir()
+
+Named after the terminal command, this method can be run from a directory node to create a subdirectory within it.
+
+Returns a shortcut to the new node if you want to optionally use it.
+
+```python
+assets = DotTree("/app/assets")
+
+new_dir = assets.images.mkdir('sprites')
+print(new_dir)
+# output: /app/assets/images/sprites
+```
+
+You can also `[optionally]` create the subdirectory AND directly interface with it in a single step.
+
+You can also create a subdirectory, create a file, and immediately interface with it in a single step.  
+
+The slight Javascript appearance of this syntax feels wrong, but if you wish to do it, `DotTree` does support it.  
+```python
+with open(assets.images.mkdir('configuration').touch('images.conf'), 'w') as fh:
+    fh.write('hello world')
+
+print(assets.images.configuration.images.conf)
+# output: /app/assets/images/configuration/images.conf
+
+config = assets.images.configuration.images.conf.load()
+print(config)
+# output: hello world
+```
+
+<hr>
+
+### rm() / rmdir()
+
+If you call this without passing in any arguments, it effectively is a call to delete the node you're calling this against.  rm() is for files.  rmdir() is for directories.
+
+```python
+# this would asking for tmp/ to be deleted
+assets.tmp.rmdir()
+```
+
+Alternatively, you can pass in the name of a node to delete.  You could do this from the parent of the node you want to delete.
+```python
+assets.files.touch('new_file.txt')
+
+# deleting using the argument
+assets.files.rm('new_file.txt')
+
+# deleting by calling rm() on the node itself
+assets.files.rm.new_file.txt.rm()
+```
+
+This works for directories as well, but only if they're empty, but that's how it works in most operating systems, so nothing new.
 
 <hr>
 
