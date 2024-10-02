@@ -21,5 +21,6 @@ logger.setLevel(log_level)
 
 from dot_tree.classes.assets import DotTree, AppData
 from dot_tree.classes.pygame import GameDotTree, GameData
+from dot_tree.classes.assets import DirectoryNotEmptyError
 
-__all__ = ['logger', 'DotTree', 'AppData', 'GameDotTree', 'GameData']
+__all__ = ['logger', 'DotTree', 'AppData', 'GameDotTree', 'GameData', 'DirectoryNotEmptyError']

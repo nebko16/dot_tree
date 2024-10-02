@@ -2,22 +2,54 @@ import os
 import re
 import sys
 import json
-import appdirs
+import builtins
 import logging
 import keyword
+import appdirs
 import traceback
 import unicodedata
 logger = logging.getLogger(__name__)
 
 
-def custom_excepthook(exc_type, exc_value, exc_traceback):
-    if issubclass(exc_type, FileNotFoundError):
+
+def is_reserved(name):
+    if keyword.iskeyword(name) or name in dir(builtins):
+        return True
+
+
+class DirectoryNotEmptyError(OSError):
+    def __init__(self, *args):
+        super().__init__(*args)
+
+
+def _excepthook(exc_type, exc_value, exc_traceback):
+    """
+        I hate how the core error message butts right up against
+        the end of the trace dump, so this override puts some
+        distance between the trace and the relevant error message
+    """
+    subclasses = [
+        FileNotFoundError,
+        AttributeError,
+        DirectoryNotEmptyError,
+        IsADirectoryError,
+        NotADirectoryError
+    ]
+
+    def _is_subclass(exc_type):
+        for subclass in subclasses:
+            if issubclass(exc_type, subclass):
+                return True
+        return False
+
+    if _is_subclass(exc_type):
         traceback.print_tb(exc_traceback)
         print(f"\n\n\n\n  {exc_type.__name__}: {exc_value}\n")
     else:
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
-sys.excepthook = custom_excepthook
 
+
+sys.excepthook = _excepthook
 
 
 
@@ -29,9 +61,11 @@ class DotTreeBranch(os.PathLike):
                  path,
                  dot_path,
                  parent,
+                 trunk,
                  is_file=False,
                  extension=None):
         self.parent = parent
+        self.trunk = trunk
         self.py_name = py_name
         self.os_name = os_name
         self.path = path
@@ -39,24 +73,198 @@ class DotTreeBranch(os.PathLike):
         self.children = {}
         self.files_base_name = {}
         self.files = {}
+        self._cached_asset = None
         self.is_file = is_file
         self.extension = extension
         self.extension_referenced = False
-        self._cached_asset = None
+        self.is_shortcut = False
 
     def __str__(self):
-        if not self.extension_referenced and self.is_file:
-            raise AttributeError(f"Files must include extension.")
+        if not self.extension_referenced and self.is_file and not self.is_shortcut:
+            dot_path = self.dot_path
+            if self.dot_path.split('.')[-1] == self.extension:
+                dot_path = '.'.join(self.dot_path.split('.')[:-1])
+            output = f"Files must include extension, if they have one:\n\n"
+            output += f"  {dot_path}.{'_'*len(self.extension)}\n"
+            output += f"{' ' * (len(self.dot_path)-1)}{'^' * len(self.extension)}"
+            raise AttributeError(output)
         self.extension_referenced = False
         return str(self.path)
 
     def __fspath__(self):
         return self.__str__()
 
-    def open(self, mode='r', buffering=-1, encoding=None, errors=None, newline=None):
-        return open(self.__fspath__(), mode, buffering, encoding, errors, newline)
+    @staticmethod
+    def _touch(filepath):
+        with open(filepath, 'a'):
+            os.utime(filepath, None)
 
-    def get_size(self, units='auto', return_only_value=False, child=False, to_stdout=True):
+    @staticmethod
+    def _mkdir(path):
+        os.mkdir(path)
+
+    def eject(self, node):
+        py_name = node.py_name
+        file_key = py_name
+        if node.is_file and node.extension is not None:
+            file_key = f"{py_name}.{node.extension}"
+        base_name = py_name.strip().lower()
+        if node.is_file and '.' in py_name:
+            base_name = py_name.split('.')[0].strip().lower()
+        if base_name in self.files_base_name:
+            del self.files_base_name[base_name]
+        if node.os_name in self.trunk.name_mappings:
+            del self.trunk.name_mappings[node.os_name]
+        if file_key in self.files:
+            del self.files[file_key]
+        if py_name in self.children:
+            del self.children[py_name]
+        del node
+
+    def rm(self, filename: str | None = None):
+        from_self = False
+        if filename is None:
+            node = self
+            from_self = True
+        else:
+            _filename = DotTree.normalize_name(filename)
+            if _filename is not None:
+                _filename = _filename.lower()
+            node = self.files.get(_filename)
+            if not node:
+                node = self.children.get(_filename)
+
+        if not node:
+            raise FileNotFoundError(f"File not found: {filename}")
+
+        if not node.is_file:
+            dot_path = self.dot_path
+            if from_self:
+                dot_path = self.parent.dot_path
+            syntax = f"  {dot_path}.{node.py_name}.rmdir()\n"
+            syntax += f"\n    {dot_path}.rmdir('{node.py_name}')"
+            raise IsADirectoryError(
+                f"Can only delete files with rm().\n\n  This node is a directory: "
+                f"{node.path}{os.path.sep}\n\n  "
+                f"Please use rmdir() for directories:\n\n  {syntax}")
+
+        if os.path.exists(node.path):
+            os.remove(node.path)
+        self.eject(node)
+
+    delete = rm
+    erase = rm
+    remove = rm
+
+
+    def rmdir(self, directory_name: str = None):
+        from_self = False
+        if directory_name is None:
+            node = self
+            from_self = True
+        else:
+            _directory_name = DotTree.normalize_name(directory_name)
+            if _directory_name is not None:
+                _directory_name = _directory_name.lower()
+            node = self.children.get(_directory_name)
+            if not node:
+                node = self.files.get(_directory_name)
+
+        if not node:
+            raise FileNotFoundError(f"Directory not found: {directory_name}")
+
+        if node.is_file:
+            dot_path = self.dot_path
+            if from_self:
+                dot_path = self.parent.dot_path
+            syntax = f"  {dot_path}.{node.py_name}.{node.extension}.rm()\n"
+            syntax += f"\n    {dot_path}.rm('{node.py_name}.{node.extension}')"
+            raise NotADirectoryError(
+                f"Can only delete directories with rmdir().\n\n  This node is a file: {node.path}"
+                f"\n\n  Use rm() for files.\n\n  {syntax}")
+
+        files = [f for f in os.listdir(node.path)]
+        if len(files) > 0:
+            aggs = node.tree(to_stdout=False)
+            raise DirectoryNotEmptyError(f"Can only delete empty directories.\n\n"
+                                         f"  Directory: {node.path}\n\n  "
+                                         f"Currently contains: {len(files)} file(s):"
+                                         f"\n\n{aggs}")
+        if os.path.exists(node.path):
+            os.rmdir(node.path)
+        self.eject(node)
+
+    rd = rmdir
+
+    def touch(self, filename):
+        if is_reserved(filename):
+            raise Exception(f"Error: '{filename}' is a reserved python keyword.  "
+                            "Please choose a different name.")
+        filepath = os.path.join(self.path, filename)
+        self._touch(filepath)
+        return self.add_child_file(filename, filepath)
+
+    def add_child_file(self, filename, child_path):
+        py_name = DotTree.normalize_name(filename)
+        py_name = py_name.lower()
+        child_dot_path = f"{self.dot_path}.{py_name}"
+        if '.' in py_name:
+            base_name = py_name.split('.')[0].strip().lower()
+            extension = py_name.split('.')[1].strip().lower()
+        else:
+            base_name = py_name.strip().lower()
+            extension = None
+        file = DotTreeBranch(base_name,
+                             filename,
+                             child_path,
+                             child_dot_path,
+                             parent=self,
+                             trunk=self.trunk,
+                             extension=extension,
+                             is_file=True)
+        self.files_base_name[base_name] = file
+        self.files[py_name] = file
+        shortcut = DotTreeBranch(base_name,
+                                 filename,
+                                 child_path,
+                                 child_dot_path,
+                                 parent=self,
+                                 trunk=self.trunk,
+                                 extension=extension,
+                                 is_file=True)
+        shortcut.is_shortcut = True
+        file.children = shortcut.children
+        file.files_base_name = shortcut.files_base_name
+        file.files = shortcut.files
+        return shortcut
+
+    def mkdir(self, node):
+        if is_reserved(node):
+            raise Exception(f"Error: '{node}' is a reserved python keyword.  "
+                            "Please choose a different name.")
+        child_path = os.path.join(self.path, node)
+        self._mkdir(child_path)
+        return self.add_child_directory(node, child_path)
+
+
+    def add_child_directory(self, node, child_path):
+        py_name = DotTree.normalize_name(node)
+        py_name = py_name.lower()
+        child_dot_path = f"{self.dot_path}.{py_name}"
+        subdir = DotTreeBranch(py_name,
+                               node,
+                               child_path,
+                               child_dot_path,
+                               parent=self,
+                               trunk=self.trunk)
+        self.children[py_name] = subdir
+        return subdir
+
+    def get_size(self,
+                 units='auto',
+                 return_only_value=False,
+                 child=False,
+                 to_stdout=True):
         if not units:
             raise Exception("\n\n\n    Units must be: auto, B, KB, MB, GB, or TB.\n")
         size: float = 0
@@ -96,12 +304,18 @@ class DotTreeBranch(os.PathLike):
 
         joined = f"File or folder not found:\n\n  {self.dot_path}.{raw_name}\n"
         joined += f"{' ' * (len(self.dot_path))}   {'^' * len(raw_name)}\n"
-        joined += f"  Files in {self.path}:\n\n"
+
         files = [f for f in os.listdir(self.path)]
-        lpad = len(max(files, key=len))
-        for file in files:
-            norm_name = DotTree.normalize_name(file).lower()
-            joined += f"  .{os.path.sep}{file.ljust(lpad, ' ')}  {self.dot_path}.{norm_name}\n"
+        lpad = 0
+        if files:
+            joined += f"  Files in {self.path}:\n\n"
+            lpad = len(max(files, key=len))
+            for file in files:
+                norm_name = DotTree.normalize_name(file).lower()
+                joined += f"  .{os.path.sep}{file.ljust(lpad, ' ')}"
+                joined += f"  {self.dot_path}.{norm_name}\n"
+        else:
+            joined += f"  No files found in {self.path}"
         raise FileNotFoundError(f"[Errno 2] {joined}")
 
     def __getitem__(self, key):
@@ -132,36 +346,11 @@ class DotTreeBranch(os.PathLike):
             if ignore_pattern.search(node):
                 continue
             child_path = os.path.join(path, node)
-            py_name = DotTree.normalize_name(node)
-            py_name = py_name.lower()
-            child_dot_path = f"{self.dot_path}.{py_name}"
             if os.path.isdir(child_path):
-                subdir = DotTreeBranch(py_name,
-                                       node,
-                                       child_path,
-                                       child_dot_path,
-                                       parent=self)
-                self.children[py_name] = subdir
+                subdir = self.add_child_directory(node, child_path)
                 subdir.build_tree(child_path)
             else:
-                if '.' in py_name:
-                    base_name = py_name.split('.')[0].strip().lower()
-                else:
-                    base_name = py_name.strip().lower()
-                if '.' in py_name:
-                    extension = py_name.split('.')[1].strip().lower()
-                else:
-                    extension = None
-
-                file = DotTreeBranch(base_name,
-                                     node,
-                                     child_path,
-                                     child_dot_path,
-                                     parent=self,
-                                     extension=extension,
-                                     is_file=True)
-                self.files_base_name[base_name] = file
-                self.files[py_name] = file
+                self.add_child_file(node, child_path)
 
     def load(self, mode='auto', decode: str = None):
         if not self.is_file:
@@ -198,7 +387,8 @@ class DotTreeBranch(os.PathLike):
         if not node:
             node = self
         if self.is_file:
-            logger.warning(f"\n\n  show_tree() is for directory nodes.\n\n  This node is a file: {self.os_name}\n\n")
+            logger.warning(f"\n\n  show_tree() is for directory nodes.\n\n  "
+                           f"This node is a file: {self.os_name}\n\n")
             return ''
         return self.parent.show_tree(node=node, to_stdout=to_stdout)
     tree = show_tree
@@ -215,6 +405,7 @@ class DotTreeBranch(os.PathLike):
         dirs.extend(files)
         return dirs
     ls = list
+    dir = list
 
 
 class DotTree:
@@ -373,14 +564,19 @@ class DotTree:
             return self.files[name]
         if name in self.files_base_name:
             return self.files_base_name[name]
-        joined = f"File or folder not found:\n\n  {self.dot_path}.{raw_name}\n"
-        joined += f"{' ' * (len(self.dot_path))}   {'^' * len(raw_name)}\n"
-        joined += f"  Files in {self.path}:\n\n"
+
+        joined = f"File or folder not found:\n\n  "
+        joined += f"{self.dot_path}.{raw_name}\n"
+        joined += f"{' ' * (len(self.dot_path))}   "
+        joined += f"{'^' * len(raw_name)}\n"
+        joined += f"  Files in {self.path}:\n"
         files = [f for f in os.listdir(self.path)]
         lpad = len(max(files, key=len))
+        joined += f"\n    {'File'.ljust(lpad, ' ')}    Python Syntax"
         for file in files:
             norm_name = DotTree.normalize_name(file).lower()
-            joined += f"  .{os.path.sep}{file.ljust(lpad, ' ')}  {self.dot_path}.{norm_name}\n"
+            joined += f"\n    .{os.path.sep}{file.ljust(lpad, ' ')}  "
+            joined += f"{self.dot_path}.{norm_name}"
         raise FileNotFoundError(f"[Errno 2] {joined}")
 
     def __getitem__(self, raw_key):
@@ -393,6 +589,97 @@ class DotTree:
             return self.files_base_name[key]
         self.__getattr__(raw_key)
 
+    def eject(self, node):
+        py_name = node.py_name
+        file_key = py_name
+        if node.is_file and node.extension is not None:
+            file_key = f"{py_name}.{node.extension}"
+        base_name = py_name
+        if node.is_file and '.' in py_name:
+            base_name = py_name.split('.')[0].strip().lower()
+        if base_name in self.files_base_name:
+            del self.files_base_name[base_name]
+        if node.os_name in self.name_mappings:
+            del self.name_mappings[node.os_name]
+        if file_key in self.files:
+            del self.files[file_key]
+        if py_name in self.children:
+            del self.children[py_name]
+        del node
+
+    def rm(self, filename: str | None = None):
+        from_self = False
+        if filename is None:
+            node = self
+            from_self = True
+        else:
+            _filename = self.normalize_name(filename)
+            if _filename is not None:
+                _filename = _filename.lower()
+            node = self.files.get(_filename)
+            if not node:
+                node = self.children.get(_filename)
+
+        if not node:
+            raise FileNotFoundError(f"File not found: {filename}")
+
+        if not node.is_file:
+            dot_path = self.dot_path
+            if from_self:
+                dot_path = self.parent.dot_path
+            syntax = f"  {dot_path}.{node.py_name}.rmdir()\n"
+            syntax += f"\n    {dot_path}.rmdir('{node.py_name}')"
+            raise IsADirectoryError(
+                f"{node.path}{os.path.sep}\n\n  Can only delete files with rm().  "
+                f"This node is a directory.\n\n  "
+                f"Please use rmdir() for directories:\n\n  {syntax}")
+
+        if os.path.exists(node.path):
+            os.remove(node.path)
+        self.eject(node)
+
+    delete = rm
+    erase = rm
+    remove = rm
+
+    def rmdir(self, directory_name: str = None):
+        from_self = False
+        if directory_name is None:
+            node = self
+            from_self = True
+        else:
+            _directory_name = self.normalize_name(directory_name)
+            if _directory_name is not None:
+                _directory_name = _directory_name.lower()
+            node = self.children.get(_directory_name)
+            if not node:
+                node = self.files.get(_directory_name)
+
+        if not node:
+            raise FileNotFoundError(f"Directory not found: {directory_name}")
+
+        if node.is_file:
+            dot_path = self.dot_path
+            if from_self:
+                dot_path = self.parent.dot_path
+            syntax = f"  {dot_path}.{node.py_name}.{node.extension}.rm()\n"
+            syntax += f"\n    {dot_path}.rm('{node.py_name}.{node.extension}')"
+            raise NotADirectoryError(
+                f"Can only delete directories.\n\n  This node is a file: {node.path}"
+                f"\n\n  Please use rm() for files.\n\n  {syntax}")
+
+        files = [f for f in os.listdir(node.path)]
+        if len(files) > 0:
+            aggs = node.tree(to_stdout=False)
+            raise DirectoryNotEmptyError(f"Can only delete empty directories.\n\n"
+                                         f"  Directory: {node.path}\n\n  "
+                                         f"Currently contains: {len(files)} file(s):"
+                                         f"\n\n{aggs}")
+        if os.path.exists(node.path):
+            os.rmdir(node.path)
+        self.eject(node)
+    rd = rmdir
+
     def get(self, key, default=None):
         if key in self.children:
             return self.children[key]
@@ -400,43 +687,99 @@ class DotTree:
             return self.files[key]
         return default
 
+    @staticmethod
+    def _touch(filepath):
+        with open(filepath, 'a'):
+            os.utime(filepath, None)
+
+    @staticmethod
+    def _mkdir(path):
+        os.mkdir(path)
+
+    def touch(self, filename):
+        if is_reserved(filename):
+            raise Exception(f"Error: '{filename}' is a reserved python keyword.  "
+                            "Please choose a different name.")
+        filepath = os.path.join(self.path, filename)
+        self._touch(filepath)
+        return self.add_child_file(filename, self.path)
+
+    def add_child_file(self, node, path):
+        child_path = os.path.join(path, node)
+        child_dot_path = f"{self.dot_path}.{self.normalize_name(node)}"
+        py_name = self.normalize_name(node)
+        if py_name != node:
+            self.name_mappings.update({node: py_name})
+        py_name = py_name.lower()
+        if '.' in py_name:
+            base_name = py_name.split('.')[0].strip().lower()
+            extension = py_name.split('.')[1].strip().lower()
+        else:
+            base_name = py_name.strip().lower()
+            extension = None
+        if base_name[0:1].isnumeric():
+            base_name = f"_{base_name}"
+        file = DotTreeBranch(base_name,
+                             node,
+                             child_path,
+                             child_dot_path,
+                             parent=self,
+                             trunk=self,
+                             extension=extension,
+                             is_file=True)
+        self.files_base_name[base_name] = file
+        self.files[py_name] = file
+        shortcut = DotTreeBranch(base_name,
+                                 node,
+                                 child_path,
+                                 child_dot_path,
+                                 parent=self,
+                                 trunk=self,
+                                 extension=extension,
+                                 is_file=True)
+        shortcut.is_shortcut = True
+        file.children = shortcut.children
+        file.files_base_name = shortcut.files_base_name
+        file.files = shortcut.files
+        return shortcut
+
+    def mkdir(self, node):
+        if is_reserved(node):
+            raise Exception(f"Error: '{node}' is a reserved python keyword.  "
+                            "Please choose a different name.")
+        child_path = os.path.join(self.path, node)
+        self._mkdir(child_path)
+        return self.add_child_directory(node, child_path)
+
+    def add_child_directory(self, node, child_path):
+        child_dot_path = f"{self.dot_path}.{self.normalize_name(node)}"
+        py_name = self.normalize_name(node)
+        if py_name != node:
+            self.name_mappings.update({node: py_name})
+        py_name = py_name.lower()
+        subdir = DotTreeBranch(py_name,
+                               node,
+                               child_path,
+                               child_dot_path,
+                               parent=self,
+                               trunk=self)
+        self.children[py_name] = subdir
+        return subdir
+
     def build_tree(self, path):
         ignore_pattern = re.compile('|'.join(self.ignored_files))
         for node in os.listdir(path):
             if ignore_pattern.search(node):
                 continue
             child_path = os.path.join(path, node)
-            child_dot_path = f"{self.dot_path}.{self.normalize_name(node)}"
-
             py_name = self.normalize_name(node)
             if py_name != node:
                 self.name_mappings.update({node: py_name})
-            py_name = py_name.lower()
             if os.path.isdir(child_path):
-                subdir = DotTreeBranch(py_name,
-                                       node,
-                                       child_path,
-                                       child_dot_path,
-                                       parent=self)
-                self.children[py_name] = subdir
+                subdir = self.add_child_directory(node, child_path)
                 subdir.build_tree(child_path)
             else:
-                base_name = py_name.split('.')[0].strip().lower()
-                if base_name[0:1].isnumeric():
-                    base_name = f"_{base_name}"
-                if '.' in py_name:
-                    extension = py_name.split('.')[1].strip().lower()
-                else:
-                    extension = None
-                file = DotTreeBranch(base_name,
-                                     node,
-                                     child_path,
-                                     child_dot_path,
-                                     parent=self,
-                                     extension=extension,
-                                     is_file=True)
-                self.files_base_name[base_name] = file
-                self.files[py_name] = file
+                self.add_child_file(node, path)
 
     def preload(self):
         for subdir in self.children.values():
@@ -494,7 +837,11 @@ class DotTree:
         return the_tree
     tree = show_tree
 
-    def get_size(self, units='auto', return_only_value=False, child=False, to_stdout=True):
+    def get_size(self,
+                 units='auto',
+                 return_only_value=False,
+                 child=False,
+                 to_stdout=True):
 
         if not units:
             raise Exception("\n\n\n    Units must be: auto, B, KB, MB, GB, or TB.\n")
@@ -562,6 +909,7 @@ class DotTree:
         dirs.extend(files)
         return dirs
     ls = list
+    dir = list
 
     def show_name_mappings(self):
         print('\n\n')
@@ -573,6 +921,8 @@ class DotTree:
     def normalize_name(original_name):
         if original_name is None:
             return None
+        if is_reserved(original_name):
+            original_name = f"_{original_name}"
         name = unicodedata.normalize('NFC', original_name)
         name = name.replace(' ', '_').replace('-', '_')
         name = ''.join(c for c in name if c.isalnum() or c in ['_', '.'])
@@ -601,7 +951,8 @@ class DotTree:
           node = assets.get_node(path)
 
           print(node)
-          # output: C:\usr\local\repos\dot_tree\src\dot_tree\assets\tiles\animated_orc\Walking\Orc_Walking.png
+          # output:
+          # C:\dot_tree\src\dot_tree\assets\tiles\animated_orc\Walking\Orc_Walking.png
 
         """
         path = path.replace('\\', '/')
@@ -832,4 +1183,6 @@ class AppData:
             with open(filepath, 'r') as f:
                 app_data: dict = json.load(f)
             return app_data
+
+
 

@@ -159,7 +159,8 @@ class GameDotTreeBranch(DotTreeBranch):
                                            node,
                                            child_path,
                                            child_dot_path,
-                                           parent=self)
+                                           parent=self,
+                                           trunk=self.trunk)
                 self.children[py_name.lower()] = subdir
                 subdir.build_tree(child_path)
             else:
@@ -176,6 +177,7 @@ class GameDotTreeBranch(DotTreeBranch):
                                          child_path,
                                          child_dot_path,
                                          parent=self,
+                                         trunk=self.trunk,
                                          extension=extension,
                                          is_file=True)
                 self.files_base_name[base_name.lower()] = file
@@ -263,7 +265,8 @@ class GameDotTree(DotTree):
                                            node,
                                            child_path,
                                            child_dot_path,
-                                           parent=self)
+                                           parent=self,
+                                           trunk=self)
                 self.children[py_name] = subdir
                 subdir.build_tree(child_path)
             else:
@@ -280,6 +283,7 @@ class GameDotTree(DotTree):
                                          child_path,
                                          child_dot_path,
                                          parent=self,
+                                         trunk=self,
                                          extension=extension,
                                          is_file=True)
                 self.files_base_name[base_name] = file
