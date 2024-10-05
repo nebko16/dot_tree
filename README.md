@@ -35,7 +35,8 @@ Interfacing with files isn't exactly hard in Python, but doing it to where it's 
 - Uses dot-notation, so your code resembles the actual paths in the OS
 - Handles underlying paths for your OS, making your code operating system agnostic
 - Due to the dot-notation and python object reference copies, you can [save any branch/node into its own variable](#shortcuts) to use as a shortcut
-- Has built-in functions to help with development: [.tree()](#tree), [.ls()](#ls), [.size()](#size)
+- Has built-in functions to help with development: [.tree()](#tree), [.ls()](#ls), [.size()](#size), [.info()](#info)
+- Has some common CLI commands to add to the theme of simplifying file system interactions: [.touch()](#touch), [.mkdir()](#mkdir), [.rm()](#rm), [.rmdir()](#rmdir)
 - Automatically caches, so reloading the same file later pulls from memory
 - Preload any part of the tree with [.preload()](#preloading) to avoid performance stutters and lag when lazy-loading assets
 - [print your dot notation path representation](#string-representation) and the output will be the actual full OS path
@@ -156,12 +157,32 @@ print(assets.sprites.player_1.jpg)
 
 ### Use as literal path
 
-You can even use the `DotTree` path object directly as a path, as it's a path-like derived instance.  `DotTree` is OS-agnostic, and will work regardless of the underlying operating system.
+You can even use the `DotTree` path object directly as a path (_**if the filepath already exists**_), as it's a path-like derived instance.  `DotTree` is OS-agnostic, and will work regardless of the underlying operating system.
 ```python
 assets = DotTree("/app/assets")
 
-with open(assets.about.txt, 'r') as fh:
-    print(fh.read())
+with open(assets.docs.about.txt, 'w') as fh:
+    fh.write('hello world')
+```
+
+#### Note!
+
+_**This won't work for filepaths that don't exist, HOWEVER**_, you can create the files and/or folders while you're using it directly, like in the example above:
+```python
+assets = DotTree("/app/assets")
+
+with open(assets.mkdir('docs').touch('about.txt'), 'w') as fh:
+    fh.write('hello world')
+```
+
+And while the above is possible and will work, this is still probably the cleaner and more pythonic way to do it:
+```python
+assets = DotTree("/app/assets")
+
+assets.mkdir('docs').touch('about.txt')
+
+with open(assets.docs.about.txt, 'w') as fh:
+    fh.write('hello world')
 ```
 
 <hr>
@@ -245,27 +266,36 @@ print(config)
 
 <hr>
 
-### rm() / rmdir()
+### rm()
 
-If you call this without passing in any arguments, it effectively is a call to delete the node you're calling this against.  rm() is for files.  rmdir() is for directories.
+Delete a file.  Does not work on directories.  Use [.rmdir()](#rmdir) for directories.  If you call this without passing in any arguments, it effectively is a call to delete the node you're calling this against:
+```python
+# deletes: test.txt
+assets.tmp.test.txt.rm()
+```
+
+Otherwise, provide the name of a direct child file of the given directory node:
+```python
+# deletes: test.txt
+assets.tmp.rm('test.txt')
+```
+
+<hr>
+
+### rmdir()
+
+Delete a directory.  You can only delete empty directories.  Provide no argument and it deletes the directory node you're calling it again.
 
 ```python
-# this would asking for tmp/ to be deleted
+# deletes: tmp/
 assets.tmp.rmdir()
 ```
 
-Alternatively, you can pass in the name of a node to delete.  You could do this from the parent of the node you want to delete.
+Otherwise, provide the name of a direct child subdirectory of the given directory node:
 ```python
-assets.files.touch('new_file.txt')
-
-# deleting using the argument
-assets.files.rm('new_file.txt')
-
-# deleting by calling rm() on the node itself
-assets.files.rm.new_file.txt.rm()
+# deletes: tmp/
+assets.rmdir('tmp')
 ```
-
-This works for directories as well, but only if they're empty, but that's how it works in most operating systems, so nothing new.
 
 <hr>
 
