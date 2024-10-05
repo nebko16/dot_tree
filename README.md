@@ -269,6 +269,49 @@ This works for directories as well, but only if they're empty, but that's how it
 
 <hr>
 
+### info()
+*This is only for `GameDotTree`, and `stats` and `details` are just aliases to the `info` method.*
+
+Run this on a node that has a cached pygame surface instance, and it outputs stats about the image.  You can suppress the output with the optional argument `to_stdout=False`.  It always returns a dictionary containing the stats.  
+
+On a node, you can just call it without any arguments, and it outputs and returns info about itself. (the cached pygame.Surface)  On the trunk (your base GameDotTree object), you have to pass in a `GameDotTreeBranch` node as the first argument.
+```python
+assets.images.small.png.load()
+assets.images.small.png.info()
+```
+Output:
+```text
+ Resolution: 123 x 456
+     Aspect: 0.27:1
+     Pixels: 56,088
+       Size: 242 B
+Color Depth: 32-bit
+  Has Alpha: True
+  Color Key: None
+```
+
+If you just need the dictionary containing the stats, you can set `to_stdout=False` to turn off printing to stdout. (it returns the dictionary regardless)
+```python
+assets.images.small.png.load()
+stats = assets.images.small.png.info(to_stdout=False)
+```
+Dict contained in `stats`:
+```python
+{
+    'aspect': '0.27:1',
+    'color_bit_depth': 32,
+    'color_key': None,
+    'has_alpha': True,
+    'height': 456,
+    'pixels': 56088,
+    'resolution': (123, 456),
+    'size': '242 B',
+    'width': 123
+}
+```
+
+<hr>
+
 ### Shortcuts
 
 Due to `Dot.Tree` using nested objects, and due to how python copies objects by reference if you don't explicitly do a copy, you can make shortcut variables for any node in the tree to reference to shorten code.

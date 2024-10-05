@@ -1,3 +1,4 @@
+from __future__ import annotations
 import os
 import re
 import pygame
@@ -145,6 +146,46 @@ class GameDotTreeBranch(DotTreeBranch):
 
         return self._cached_asset
 
+    def info(self, image_node: GameDotTreeBranch = None, to_stdout: bool = True):
+        surface: pygame.Surface | None = None
+        if isinstance(image_node, GameDotTreeBranch):
+            surface = image_node.load()
+        if image_node is None and self._cached_asset:
+            surface = self._cached_asset
+        if isinstance(surface, pygame.Surface):
+            if isinstance(image_node, GameDotTreeBranch):
+                size: str = image_node.size(to_stdout=False)
+            else:
+                size: str = self.size(to_stdout=False)
+            stats = {
+                'resolution': (surface.width, surface.height),
+                'width': surface.width,
+                'height': surface.height,
+                'pixels': surface.width * surface.height,
+                'aspect': f"{round(surface.width/surface.height, 2)}:1",
+                'color_bit_depth': surface.get_bitsize(),
+                'has_alpha': bool(surface.get_flags() & pygame.SRCALPHA),
+                'color_key': surface.get_colorkey(),
+                'size': size
+            }
+            if to_stdout:
+                output = f"\n\n\n\n Resolution: {stats['width']} x {stats['height']}\n"
+                output += f"     Aspect: {stats['aspect']}\n"
+                output += f"     Pixels: {stats['pixels']:,d}\n"
+                output += f"       Size: {stats['size']}\n"
+                output += f"Color Depth: {stats['color_bit_depth']}-bit\n"
+                output += f"  Has Alpha: {stats['has_alpha']}\n"
+                output += f"  Color Key: {stats['color_key']}\n\n"
+                print(output)
+            return stats
+        else:
+            print(type(surface))
+            raise TypeError(
+                "at the moment, info() method only supports pygame.Surface objects "
+                "either by argument, or local cache if it's already loaded.")
+    stats = info
+    details = info
+
     def build_tree(self, path):
         ignore_pattern = re.compile('|'.join(GameDotTree.ignored_files))
         for node in os.listdir(path):
@@ -288,6 +329,39 @@ class GameDotTree(DotTree):
                                          is_file=True)
                 self.files_base_name[base_name] = file
                 self.files[py_name] = file
+
+    @staticmethod
+    def info(image_node: GameDotTreeBranch, to_stdout: bool = True):
+        surface = image_node.load()
+        if isinstance(surface, pygame.Surface):
+            stats = {
+                'resolution': (surface.width, surface.height),
+                'width': surface.width,
+                'height': surface.height,
+                'pixels': surface.width * surface.height,
+                'aspect': f"{round(surface.width/surface.height, 2)}:1",
+                'color_bit_depth': surface.get_bitsize(),
+                'has_alpha': bool(surface.get_flags() & pygame.SRCALPHA),
+                'color_key': surface.get_colorkey(),
+                'size': image_node.size(to_stdout=False)
+            }
+            if to_stdout:
+                output = f"\n\n\n\n Resolution: {stats['width']} x {stats['height']}\n"
+                output += f"     Aspect: {stats['aspect']}\n"
+                output += f"     Pixels: {stats['pixels']:,d}\n"
+                output += f"       Size: {stats['size']}\n"
+                output += f"Color Depth: {stats['color_bit_depth']}-bit\n"
+                output += f"  Has Alpha: {stats['has_alpha']}\n"
+                output += f"  Color Key: {stats['color_key']}\n\n"
+                print(output)
+            return stats
+        else:
+            print(type(surface))
+            raise TypeError(
+                "at the moment, info() method only supports pygame.Surface objects "
+                "either by argument")
+    stats = info
+    details = info
 
 
 
