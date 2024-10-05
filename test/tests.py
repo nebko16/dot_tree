@@ -603,23 +603,60 @@ class TestGameDotTree(unittest.TestCase):
         with self.assertRaises(NotADirectoryError):
             assets.subdir0.rmdir('file.txt')
 
-    def test_image_info_from_cache(self):
+    def test_image_info_from_cache_load(self):
+        assets = GameDotTree('assets')
+        assets.images.small.png.load()
+        output = assets.images.small.png.info(to_stdout=False)
+        expected_output = ("{'resolution': (123, 456), 'width': 123, 'height': 456, "
+                           "'pixels': 56088, 'aspect': '0.27:1', 'color_bit_depth':"
+                           " 32, 'has_alpha': True, 'color_key': None, 'size': "
+                           "'242 B'}")
+        self.assertEqual(str(output), expected_output)
+
+    def test_image_info_from_preloaded_cache(self):
         assets = GameDotTree('assets')
         assets.images.preload()
         output = assets.images.small.png.info(to_stdout=False)
-        expected_output = ("{'size': (123, 456), 'width': 123, 'height': 456, "
-                           "'pixels': 56088, 'aspect': '0.27:1', 'color_bit_depth': "
-                           "32, 'has_alpha': True, 'color_key': None}")
+        expected_output = ("{'resolution': (123, 456), 'width': 123, 'height': 456, "
+                           "'pixels': 56088, 'aspect': '0.27:1', 'color_bit_depth':"
+                           " 32, 'has_alpha': True, 'color_key': None, 'size': "
+                           "'242 B'}")
         self.assertEqual(str(output), expected_output)
 
-    def test_image_info_from_file(self):
+    def test_image_info_trunk_from_file(self):
         assets = GameDotTree('assets')
-        image = assets.images.small.png.load()
-        output = assets.info(image, to_stdout=False)
-        expected_output = ("{'size': (123, 456), 'width': 123, 'height': 456, "
-                           "'pixels': 56088, 'aspect': '0.27:1', 'color_bit_depth': "
-                           "32, 'has_alpha': True, 'color_key': None}")
+        output = assets.info(assets.images.small.png, to_stdout=False)
+        expected_output = ("{'resolution': (123, 456), 'width': 123, 'height': 456, "
+                           "'pixels': 56088, 'aspect': '0.27:1', 'color_bit_depth':"
+                           " 32, 'has_alpha': True, 'color_key': None, 'size': "
+                           "'242 B'}")
         self.assertEqual(str(output), expected_output)
+
+    def test_image_info_node_from_file(self):
+        assets = GameDotTree('assets')
+        output = assets.images.info(assets.images.small.png, to_stdout=False)
+        expected_output = ("{'resolution': (123, 456), 'width': 123, 'height': 456, "
+                           "'pixels': 56088, 'aspect': '0.27:1', 'color_bit_depth':"
+                           " 32, 'has_alpha': True, 'color_key': None, 'size': "
+                           "'242 B'}")
+        self.assertEqual(str(output), expected_output)
+
+    def test_image_info_dict_output(self):
+        assets = GameDotTree('assets')
+        assets.images.small.png.load()
+        output = assets.images.small.png.info(to_stdout=False)
+        print()
+        import json
+        print(json.dumps(output, indent=4, sort_keys=True))
+        print()
+        expected_output = ("{'resolution': (123, 456), 'width': 123, 'height': 456, "
+                           "'pixels': 56088, 'aspect': '0.27:1', 'color_bit_depth':"
+                           " 32, 'has_alpha': True, 'color_key': None, 'size': "
+                           "'242 B'}")
+        assets.images.small.png.size()
+        self.assertEqual(str(output), expected_output)
+
+
 
 
 

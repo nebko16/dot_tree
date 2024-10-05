@@ -1,3 +1,4 @@
+from __future__ import annotations
 import os
 import re
 import pygame
@@ -145,27 +146,36 @@ class GameDotTreeBranch(DotTreeBranch):
 
         return self._cached_asset
 
-    def info(self, surface: pygame.Surface = None, to_stdout: bool = True):
-        if not surface:
+    def info(self, image_node: GameDotTreeBranch = None, to_stdout: bool = True):
+        surface: pygame.Surface | None = None
+        if isinstance(image_node, GameDotTreeBranch):
+            surface = image_node.load()
+        if image_node is None and self._cached_asset:
             surface = self._cached_asset
         if isinstance(surface, pygame.Surface):
+            if isinstance(image_node, GameDotTreeBranch):
+                size: str = image_node.size(to_stdout=False)
+            else:
+                size: str = self.size(to_stdout=False)
             stats = {
-                'size': (surface.width, surface.height),
+                'resolution': (surface.width, surface.height),
                 'width': surface.width,
                 'height': surface.height,
                 'pixels': surface.width * surface.height,
                 'aspect': f"{round(surface.width/surface.height, 2)}:1",
                 'color_bit_depth': surface.get_bitsize(),
                 'has_alpha': bool(surface.get_flags() & pygame.SRCALPHA),
-                'color_key': surface.get_colorkey()
+                'color_key': surface.get_colorkey(),
+                'size': size
             }
             if to_stdout:
-                output = f"\n\n\n\n Resolution: {stats['width']} x {stats['height']}"
-                output += f"     Aspect: {stats['aspect']}"
-                output += f"     Pixels: {stats['pixels']:,d}"
-                output += f"Color Depth: {stats['color_bit_depth']}-bit"
-                output += f"  Has Alpha: {stats['has_alpha']}"
-                output += f"  Color Key: {stats['color_key']}\n"
+                output = f"\n\n\n\n Resolution: {stats['width']} x {stats['height']}\n"
+                output += f"     Aspect: {stats['aspect']}\n"
+                output += f"     Pixels: {stats['pixels']:,d}\n"
+                output += f"       Size: {stats['size']}\n"
+                output += f"Color Depth: {stats['color_bit_depth']}-bit\n"
+                output += f"  Has Alpha: {stats['has_alpha']}\n"
+                output += f"  Color Key: {stats['color_key']}\n\n"
                 print(output)
             return stats
         else:
@@ -321,25 +331,28 @@ class GameDotTree(DotTree):
                 self.files[py_name] = file
 
     @staticmethod
-    def info(surface: pygame.Surface, to_stdout: bool = True):
+    def info(image_node: GameDotTreeBranch, to_stdout: bool = True):
+        surface = image_node.load()
         if isinstance(surface, pygame.Surface):
             stats = {
-                'size': (surface.width, surface.height),
+                'resolution': (surface.width, surface.height),
                 'width': surface.width,
                 'height': surface.height,
                 'pixels': surface.width * surface.height,
                 'aspect': f"{round(surface.width/surface.height, 2)}:1",
                 'color_bit_depth': surface.get_bitsize(),
                 'has_alpha': bool(surface.get_flags() & pygame.SRCALPHA),
-                'color_key': surface.get_colorkey()
+                'color_key': surface.get_colorkey(),
+                'size': image_node.size(to_stdout=False)
             }
             if to_stdout:
-                output = f"\n\n\n\n Resolution: {stats['width']} x {stats['height']}"
-                output += f"     Aspect: {stats['aspect']}"
-                output += f"     Pixels: {stats['pixels']:,d}"
-                output += f"Color Depth: {stats['color_bit_depth']}-bit"
-                output += f"  Has Alpha: {stats['has_alpha']}"
-                output += f"  Color Key: {stats['color_key']}\n"
+                output = f"\n\n\n\n Resolution: {stats['width']} x {stats['height']}\n"
+                output += f"     Aspect: {stats['aspect']}\n"
+                output += f"     Pixels: {stats['pixels']:,d}\n"
+                output += f"       Size: {stats['size']}\n"
+                output += f"Color Depth: {stats['color_bit_depth']}-bit\n"
+                output += f"  Has Alpha: {stats['has_alpha']}\n"
+                output += f"  Color Key: {stats['color_key']}\n\n"
                 print(output)
             return stats
         else:

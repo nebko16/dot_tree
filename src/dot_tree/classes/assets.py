@@ -272,9 +272,9 @@ class DotTreeBranch(os.PathLike):
             size = os.path.getsize(self.path)
         else:
             for file in self.files.values():
-                size += file.get_size(child=True)
+                size += file.get_size(child=True, to_stdout=to_stdout)
             for subdir in self.children.values():
-                size += subdir.get_size(child=True)
+                size += subdir.get_size(child=True, to_stdout=to_stdout)
         if child:
             return size
         the_size = DotTree.filesizes(size, units, return_only_value)
@@ -851,10 +851,10 @@ class DotTree:
             size = os.path.getsize(self.path)
         else:
             for file in self.files.values():
-                size += file.get_size(child=True)
+                size += file.get_size(child=True, to_stdout=to_stdout)
 
             for subdir in self.children.values():
-                size += subdir.get_size(child=True)
+                size += subdir.get_size(child=True, to_stdout=to_stdout)
 
         if child:
             return size
