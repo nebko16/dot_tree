@@ -603,6 +603,24 @@ class TestGameDotTree(unittest.TestCase):
         with self.assertRaises(NotADirectoryError):
             assets.subdir0.rmdir('file.txt')
 
+    def test_image_info_from_cache(self):
+        assets = GameDotTree('assets')
+        assets.images.preload()
+        output = assets.images.small.png.info(to_stdout=False)
+        expected_output = ("{'size': (123, 456), 'width': 123, 'height': 456, "
+                           "'pixels': 56088, 'aspect': '0.27:1', 'color_bit_depth': "
+                           "32, 'has_alpha': True, 'color_key': None}")
+        self.assertEqual(str(output), expected_output)
+
+    def test_image_info_from_file(self):
+        assets = GameDotTree('assets')
+        image = assets.images.small.png.load()
+        output = assets.info(image, to_stdout=False)
+        expected_output = ("{'size': (123, 456), 'width': 123, 'height': 456, "
+                           "'pixels': 56088, 'aspect': '0.27:1', 'color_bit_depth': "
+                           "32, 'has_alpha': True, 'color_key': None}")
+        self.assertEqual(str(output), expected_output)
+
 
 
 if __name__ == '__main__':

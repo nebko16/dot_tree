@@ -145,6 +145,37 @@ class GameDotTreeBranch(DotTreeBranch):
 
         return self._cached_asset
 
+    def info(self, surface: pygame.Surface = None, to_stdout: bool = True):
+        if not surface:
+            surface = self._cached_asset
+        if isinstance(surface, pygame.Surface):
+            stats = {
+                'size': (surface.width, surface.height),
+                'width': surface.width,
+                'height': surface.height,
+                'pixels': surface.width * surface.height,
+                'aspect': f"{round(surface.width/surface.height, 2)}:1",
+                'color_bit_depth': surface.get_bitsize(),
+                'has_alpha': bool(surface.get_flags() & pygame.SRCALPHA),
+                'color_key': surface.get_colorkey()
+            }
+            if to_stdout:
+                output = f"\n\n\n\n Resolution: {stats['width']} x {stats['height']}"
+                output += f"     Aspect: {stats['aspect']}"
+                output += f"     Pixels: {stats['pixels']:,d}"
+                output += f"Color Depth: {stats['color_bit_depth']}-bit"
+                output += f"  Has Alpha: {stats['has_alpha']}"
+                output += f"  Color Key: {stats['color_key']}\n"
+                print(output)
+            return stats
+        else:
+            print(type(surface))
+            raise TypeError(
+                "at the moment, info() method only supports pygame.Surface objects "
+                "either by argument, or local cache if it's already loaded.")
+    stats = info
+    details = info
+
     def build_tree(self, path):
         ignore_pattern = re.compile('|'.join(GameDotTree.ignored_files))
         for node in os.listdir(path):
@@ -288,6 +319,36 @@ class GameDotTree(DotTree):
                                          is_file=True)
                 self.files_base_name[base_name] = file
                 self.files[py_name] = file
+
+    @staticmethod
+    def info(surface: pygame.Surface, to_stdout: bool = True):
+        if isinstance(surface, pygame.Surface):
+            stats = {
+                'size': (surface.width, surface.height),
+                'width': surface.width,
+                'height': surface.height,
+                'pixels': surface.width * surface.height,
+                'aspect': f"{round(surface.width/surface.height, 2)}:1",
+                'color_bit_depth': surface.get_bitsize(),
+                'has_alpha': bool(surface.get_flags() & pygame.SRCALPHA),
+                'color_key': surface.get_colorkey()
+            }
+            if to_stdout:
+                output = f"\n\n\n\n Resolution: {stats['width']} x {stats['height']}"
+                output += f"     Aspect: {stats['aspect']}"
+                output += f"     Pixels: {stats['pixels']:,d}"
+                output += f"Color Depth: {stats['color_bit_depth']}-bit"
+                output += f"  Has Alpha: {stats['has_alpha']}"
+                output += f"  Color Key: {stats['color_key']}\n"
+                print(output)
+            return stats
+        else:
+            print(type(surface))
+            raise TypeError(
+                "at the moment, info() method only supports pygame.Surface objects "
+                "either by argument")
+    stats = info
+    details = info
 
 
 
