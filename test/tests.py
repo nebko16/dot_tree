@@ -645,17 +645,12 @@ class TestGameDotTree(unittest.TestCase):
         assets = GameDotTree('assets')
         assets.images.small.png.load()
         output = assets.images.small.png.info(to_stdout=False)
-        print()
-        import json
-        print(json.dumps(output, indent=4, sort_keys=True))
-        print()
         expected_output = ("{'resolution': (123, 456), 'width': 123, 'height': 456, "
                            "'pixels': 56088, 'aspect': '0.27:1', 'color_bit_depth':"
                            " 32, 'has_alpha': True, 'color_key': None, 'size': "
                            "'242 B'}")
         assets.images.small.png.size()
         self.assertEqual(str(output), expected_output)
-
 
 
 

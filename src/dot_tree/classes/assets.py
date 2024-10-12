@@ -287,6 +287,7 @@ class DotTreeBranch(os.PathLike):
         name = raw_name.strip().lower()
         if self.is_file and name == self.extension:
             self.extension_referenced = True
+            self.is_shortcut = True
             return self
 
         elif self.is_file and name != self.extension:
